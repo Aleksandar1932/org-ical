@@ -46,6 +46,42 @@ def setup():
     return config_dir
 
 
+def filter_org_root(temp_dir: str, config: OmegaConf):
+    """
+    Crawls the org root and filter the files needed for export and puts them in temp_dir
+    """
+    td = temp_dir
+
+    for file in glob.glob("**/*.org", recursive=True):
+        skip = False
+        if config.strategy == Strategy.WHITELIST.name and file not in config.whitelist:
+            skip = True
+        if config.strategy == Strategy.BLACKLIST.name and file in config.blacklist:
+            skip = True
+
+        if skip:
+            logger.debug(f"Skipping {file}")
+            continue
+        copy2(file, os.path.join(td, file))
+
+
+def export_org_2_ics(td: str):
+    for file in os.listdir(td):
+        if file.endswith("org"):
+            logger.info(f"Exporting {file} to ics")
+            os.system(
+                f'emacs {file} --batch -l test.el --eval "(org-icalendar-export-to-ics)"'
+            )
+
+
+def upload_to_provider(td: str, config: OmegaConf):
+    for file in os.listdir(td):
+        if file.endswith(".ics"):
+            logger.info(f"Creating events for {file}")
+            args = Namespace(ics=file, cal=config.calendar)
+            main(args)
+
+
 if __name__ == "__main__":
     config_dir = setup()
     config = OmegaConf.load(os.path.join(config_dir, "config.yaml"))
@@ -53,21 +89,7 @@ if __name__ == "__main__":
     logger = get_logger("export")
     os.chdir(config.root_org_dir)
     with tempfile.TemporaryDirectory() as td:
-        for file in glob.glob("**/*.org", recursive=True):
-            skip = False
-            if (
-                config.strategy == Strategy.WHITELIST.name
-                and file not in config.whitelist
-            ):
-                skip = True
-            if config.strategy == Strategy.BLACKLIST.name and file in config.blacklist:
-                skip = True
-
-            if skip:
-                logger.debug(f"Skipping {file}")
-                continue
-            copy2(file, os.path.join(td, file))
-
+        filter_org_root(td, config)
         os.chdir(td)
 
         # setup org-icalendar
@@ -77,16 +99,5 @@ if __name__ == "__main__":
                 """(setq org-icalendar-include-todo '(all))\n(setq org-icalendar-use-scheduled '(event-if-todo event-if-not-todo))\n(setq org-icalendar-use-deadline '(event-if-todo event-if-not-todo))"""
             )
 
-        # exporting to ics
-        for file in os.listdir(td):
-            if file.endswith("org"):
-                logger.info(f"Exporting {file} to ics")
-                os.system(
-                    f'emacs {file} --batch -l test.el --eval "(org-icalendar-export-to-ics)"'
-                )
-
-        for file in os.listdir(td):
-            if file.endswith(".ics"):
-                logger.info(f"Creating events for {file}")
-                args = Namespace(ics=file, cal=config.calendar)
-                main(args)
+        export_org_2_ics(td)
+        upload_to_provider(td, config)
