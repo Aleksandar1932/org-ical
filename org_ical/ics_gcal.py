@@ -188,14 +188,16 @@ def cb_insert_event(request_id, response, e):
     else:
         print("({}) - Exception {}".format(request_id, e))
 
+
 def clear_calendar(http, service, calendar_id: str) -> None:
     batch = service.new_batch_http_request()
     existing_events = service.events().list(calendarId=calendar_id).execute()
 
     # print(existing_events)
-    for event in existing_events['items']:
-        batch.add(service.events().delete(calendarId=calendar_id, eventId=event['id']))
+    for event in existing_events["items"]:
+        batch.add(service.events().delete(calendarId=calendar_id, eventId=event["id"]))
     batch.execute(http=http)
+
 
 def main(args):
     """The usage of the Google Calendar API.
@@ -215,7 +217,6 @@ def main(args):
         # TODO Create calendar
         return 1
 
-
     clear_calendar(http, service, calendar_id)
     events = parse_ics(args.ics)
 
@@ -223,6 +224,7 @@ def main(args):
     for i, event in enumerate(events):
         batch.add(service.events().insert(calendarId=calendar_id, body=event))
     batch.execute(http=http)
+
 
 if __name__ == "__main__":
     parser = argparser()
