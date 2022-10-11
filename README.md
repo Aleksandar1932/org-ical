@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/org-ical.svg)](https://badge.fury.io/py/org-ical)
+
 # org-ical
 Sync org files to a remote calendar.
 
